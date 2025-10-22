@@ -1,0 +1,47 @@
+{
+  "name": "Sales Call Script - Product Demo",
+  "description": "Standard script for product demonstration calls",
+  "introduction": {
+    "required": true,
+    "description": "Professional greeting and introduction phase",
+    "keyPoints": [
+      "Greet the customer warmly",
+      "Introduce yourself and company",
+      "Confirm customer's availability",
+      "Set expectations for the call duration"
+    ]
+  },
+  "pitch": {
+    "required": true,
+    "description": "Present the product/service value proposition",
+    "keyPoints": [
+      "Explain the main product benefits",
+      "Address customer pain points",
+      "Provide specific examples or case studies",
+      "Highlight unique selling points",
+      "Ask for feedback and questions"
+    ]
+  },
+  "dataCollection": {
+    "required": true,
+    "description": "Gather essential customer information",
+    "keyPoints": [
+      "Collect contact information (email, phone)",
+      "Understand current business needs",
+      "Assess budget and timeline",
+      "Identify decision makers",
+      "Document customer requirements"
+    ]
+  },
+  "closing": {
+    "required": true,
+    "description": "Professional call conclusion",
+    "keyPoints": [
+      "Summarize key discussion points",
+      "Confirm next steps and timeline",
+      "Schedule follow-up meeting if needed",
+      "Thank the customer for their time",
+      "Provide contact information for questions"
+    ]
+  }
+}
