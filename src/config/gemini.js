@@ -44,14 +44,14 @@ class GeminiService {
       key !== 'createdAt' && key !== 'updatedAt'
     );
 
-    // Build dynamic stages object for the response
-    const stagesObject = {};
-    stageNames.forEach(stageName => {
-      stagesObject[stageName] = {
-        "present": false,
-        "evidence": ""
-      };
-    });
+    // Build example format
+    const exampleStages = stageNames.map((stage, index) => {
+      const isFirst = index === 0;
+      return `    "${stage}": {
+      "present": ${isFirst ? 'true' : 'false'},
+      "evidence": ${isFirst ? '"relevant quote from transcript"' : '""'}
+    }`;
+    }).join(',\n');
 
     return `
 You are an expert call quality analyst. Analyze the following conversation transcript against the provided call script and call stages to determine if all required stages are covered.
@@ -72,28 +72,69 @@ For each stage defined in the call stages, determine:
 
 STAGES TO ANALYZE: ${stageNames.join(', ')}
 
-RESPONSE FORMAT (JSON only, no additional text):
+IMPORTANT: You must respond with ONLY valid JSON, no markdown formatting, no code blocks, no additional text before or after.
+
+RESPONSE FORMAT - Return a JSON object with this exact structure:
 {
-  "stages": ${JSON.stringify(stagesObject, null, 2)},
-  "summary": "Brief summary of the analysis"
+  "stages": {
+${stageNames.map(stage => `    "${stage}": {
+      "present": false,
+      "evidence": ""
+    }`).join(',\n')}
+  },
+  "summary": ""
 }
 
-Be thorough but concise. Focus on factual analysis based on the transcript content. Only include stages that are defined in the call stages object.
+EXAMPLE OUTPUT FORMAT:
+{
+  "stages": {
+${exampleStages}
+  },
+  "summary": "Brief summary describing which stages were found"
+}
+
+CRITICAL: Return ONLY the JSON object. Do not include markdown formatting like \`\`\`json or \`\`\`. Start directly with { and end with }.
 `;
   }
 
   parseAnalysisResponse(text) {
     try {
+      // Log the raw response for debugging
+      logger.info('Raw Gemini response received:', text.substring(0, 500));
+      
+      // Remove markdown code blocks if present
+      let cleanedText = text.trim();
+      
+      // Remove markdown code blocks (```json or ```)
+      cleanedText = cleanedText.replace(/^```(?:json)?\s*\n?/gm, '');
+      cleanedText = cleanedText.replace(/\n?```\s*$/gm, '');
+      
       // Extract JSON from response (in case there's extra text)
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        logger.error('No JSON found in response. Full response:', text);
         throw new Error('No valid JSON found in response');
       }
       
-      return JSON.parse(jsonMatch[0]);
+      const jsonText = jsonMatch[0];
+      const parsed = JSON.parse(jsonText);
+      
+      // Validate the response structure
+      if (!parsed.stages || typeof parsed.stages !== 'object') {
+        logger.error('Invalid response structure. Parsed:', parsed);
+        throw new Error('Response missing required "stages" object');
+      }
+      
+      if (!parsed.summary || typeof parsed.summary !== 'string') {
+        logger.warn('Response missing summary field, adding default');
+        parsed.summary = 'Analysis completed';
+      }
+      
+      return parsed;
     } catch (error) {
       logger.error('Failed to parse Gemini response:', error);
-      throw new Error('Invalid response format from AI');
+      logger.error('Response text that failed to parse:', text);
+      throw new Error(`Invalid response format from AI: ${error.message}`);
     }
   }
 
