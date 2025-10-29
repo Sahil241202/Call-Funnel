@@ -3,26 +3,11 @@ const Joi = require('joi');
 const callScriptSchema = Joi.object({
   name: Joi.string().required().min(1).max(100),
   description: Joi.string().optional().max(500),
-  introduction: Joi.object({
-    required: Joi.boolean().default(true),
-    description: Joi.string().required(),
-    keyPoints: Joi.array().items(Joi.string()).default([])
-  }).required(),
-  pitch: Joi.object({
-    required: Joi.boolean().default(true),
-    description: Joi.string().required(),
-    keyPoints: Joi.array().items(Joi.string()).default([])
-  }).required(),
-  dataCollection: Joi.object({
-    required: Joi.boolean().default(true),
-    description: Joi.string().required(),
-    keyPoints: Joi.array().items(Joi.string()).default([])
-  }).required(),
-  closing: Joi.object({
-    required: Joi.boolean().default(true),
-    description: Joi.string().required(),
-    keyPoints: Joi.array().items(Joi.string()).default([])
-  }).required()
+  id: Joi.alternatives().try(
+    Joi.number().integer().positive(),
+    Joi.string().min(1)
+  ).required(),
+  content: Joi.string().optional() // Content will be populated by backend
 });
 
 const transcriptSchema = Joi.object({
@@ -36,8 +21,22 @@ const transcriptSchema = Joi.object({
 
 const analysisRequestSchema = Joi.object({
   transcriptId: Joi.string().required(),
-  callScriptId: Joi.string().required()
+  callScriptId: Joi.string().required(),
+  callStageId: Joi.string().required()
 });
+
+// Dynamic call stages schema - allows any stage names with required structure
+const callStagesSchema = Joi.object({
+  name: Joi.string().required().min(1).max(100),
+  description: Joi.string().optional().max(500)
+}).pattern(
+  Joi.string().min(1), // Any string key (stage name)
+  Joi.object({
+    required: Joi.boolean().default(true),
+    description: Joi.string().required(),
+    keyPoints: Joi.array().items(Joi.string()).default([])
+  })
+).min(1); // At least one stage must be provided
 
 const validate = (schema) => {
   return (req, res, next) => {
@@ -56,5 +55,6 @@ const validate = (schema) => {
 module.exports = {
   validateCallScript: validate(callScriptSchema),
   validateTranscript: validate(transcriptSchema),
-  validateAnalysisRequest: validate(analysisRequestSchema)
+  validateAnalysisRequest: validate(analysisRequestSchema),
+  validateCallStages: validate(callStagesSchema)
 };

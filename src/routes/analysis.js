@@ -7,9 +7,9 @@ const logger = require('../config/logger');
 // Analyze a transcript against a call script
 router.post('/analyze', validateAnalysisRequest, async (req, res) => {
   try {
-    const { transcriptId, callScriptId } = req.body;
+    const { transcriptId, callScriptId, callStageId } = req.body;
     
-    const analysis = await analysisService.analyzeCall(transcriptId, callScriptId);
+    const analysis = await analysisService.analyzeCall(transcriptId, callScriptId, callStageId);
     
     logger.info(`Analysis completed: ${analysis.id}`);
     

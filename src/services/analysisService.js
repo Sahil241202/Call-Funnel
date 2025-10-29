@@ -4,11 +4,12 @@ const logger = require('../config/logger');
 const { v4: uuidv4 } = require('uuid');
 
 class AnalysisService {
-  async analyzeCall(transcriptId, callScriptId) {
+  async analyzeCall(transcriptId, callScriptId, callStageId) {
     try {
-      // Get transcript and call script from database
+      // Get transcript, call script, and call stages from database
       const transcript = database.getTranscript(transcriptId);
       const callScript = database.getCallScript(callScriptId);
+      const callStages = database.getCallStages(callStageId);
 
       if (!transcript) {
         throw new Error('Transcript not found');
@@ -18,10 +19,15 @@ class AnalysisService {
         throw new Error('Call script not found');
       }
 
+      if (!callStages) {
+        throw new Error('Call stages not found');
+      }
+
       // Perform AI analysis
       const analysisResult = await geminiService.analyzeCallScript(
         transcript.content,
-        callScript
+        callScript,
+        callStages
       );
 
       // Create analysis record
@@ -30,11 +36,13 @@ class AnalysisService {
         id: analysisId,
         transcriptId,
         callScriptId,
+        callStageId,
         result: analysisResult,
         status: 'completed',
         metadata: {
           transcriptMetadata: transcript.metadata,
           callScriptName: callScript.name,
+          callStagesName: callStages.name,
           analyzedAt: new Date()
         }
       };
@@ -42,7 +50,7 @@ class AnalysisService {
       // Save analysis
       database.saveAnalysis(analysisId, analysis);
 
-      logger.info(`Analysis completed for transcript ${transcriptId} and script ${callScriptId}`);
+      logger.info(`Analysis completed for transcript ${transcriptId}, script ${callScriptId}, and stages ${callStageId}`);
 
       return analysis;
     } catch (error) {

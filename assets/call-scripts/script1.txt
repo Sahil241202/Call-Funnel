@@ -1,0 +1,29 @@
+This is a sample call script for insurance sales.
+
+GREETING:
+- Hello, this is Sarah from TechSolutions Insurance
+- How are you doing today?
+- Do you have a few minutes to discuss your insurance needs?
+
+INTRODUCTION:
+- I'm calling to help you find the best insurance coverage
+- We offer comprehensive insurance solutions
+- Our rates are competitive and our service is excellent
+
+PITCH:
+- Our insurance plans cover all major risks
+- We provide 24/7 customer support
+- Claims are processed quickly and efficiently
+- Special discounts available for new customers
+
+DATA COLLECTION:
+- What type of insurance are you looking for?
+- What's your current insurance situation?
+- What's your budget range?
+- When do you need coverage to start?
+
+CLOSING:
+- I'll send you a detailed quote within 24 hours
+- Would you like to schedule a follow-up call?
+- Thank you for your time today
+- Have a great day!

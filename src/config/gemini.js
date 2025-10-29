@@ -22,9 +22,9 @@ class GeminiService {
     });
   }
 
-  async analyzeCallScript(transcript, callScript) {
+  async analyzeCallScript(transcript, callScript, callStages) {
     try {
-      const prompt = this.buildAnalysisPrompt(transcript, callScript);
+      const prompt = this.buildAnalysisPrompt(transcript, callScript, callStages);
       
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
@@ -37,57 +37,48 @@ class GeminiService {
     }
   }
 
-  buildAnalysisPrompt(transcript, callScript) {
-    return `
-You are an expert call quality analyst. Analyze the following conversation transcript against the provided call script to determine if all required points are covered.
+  buildAnalysisPrompt(transcript, callScript, callStages) {
+    // Extract stage names from callStages dynamically
+    const stageNames = Object.keys(callStages).filter(key => 
+      key !== 'id' && key !== 'name' && key !== 'description' && 
+      key !== 'createdAt' && key !== 'updatedAt'
+    );
 
-CALL SCRIPT REQUIREMENTS:
+    // Build dynamic stages object for the response
+    const stagesObject = {};
+    stageNames.forEach(stageName => {
+      stagesObject[stageName] = {
+        "present": false,
+        "evidence": ""
+      };
+    });
+
+    return `
+You are an expert call quality analyst. Analyze the following conversation transcript against the provided call script and call stages to determine if all required stages are covered.
+
+CALL SCRIPT:
 ${JSON.stringify(callScript, null, 2)}
+
+CALL STAGES REQUIREMENTS:
+${JSON.stringify(callStages, null, 2)}
 
 TRANSCRIPT TO ANALYZE:
 ${transcript}
 
 ANALYSIS TASK:
-For each of the 4 main points (Introduction, Pitch, Data Collection, Closing), determine:
-1. Is this point present in the transcript? (true/false)
-2. What evidence supports this? (quote relevant parts)
-3. Quality score (1-10) - how well was this point executed?
-4. Suggestions for improvement
+For each stage defined in the call stages, determine:
+1. Is this stage present in the transcript? (true/false)
+2. What evidence supports this? (quote relevant parts from transcript)
+
+STAGES TO ANALYZE: ${stageNames.join(', ')}
 
 RESPONSE FORMAT (JSON only, no additional text):
 {
-  "overallScore": number,
-  "points": {
-    "introduction": {
-      "present": boolean,
-      "evidence": "string",
-      "qualityScore": number,
-      "suggestions": "string"
-    },
-    "pitch": {
-      "present": boolean,
-      "evidence": "string", 
-      "qualityScore": number,
-      "suggestions": "string"
-    },
-    "dataCollection": {
-      "present": boolean,
-      "evidence": "string",
-      "qualityScore": number,
-      "suggestions": "string"
-    },
-    "closing": {
-      "present": boolean,
-      "evidence": "string",
-      "qualityScore": number,
-      "suggestions": "string"
-    }
-  },
-  "summary": "string",
-  "recommendations": ["string"]
+  "stages": ${JSON.stringify(stagesObject, null, 2)},
+  "summary": "Brief summary of the analysis"
 }
 
-Be thorough but concise. Focus on factual analysis based on the transcript content.
+Be thorough but concise. Focus on factual analysis based on the transcript content. Only include stages that are defined in the call stages object.
 `;
   }
 

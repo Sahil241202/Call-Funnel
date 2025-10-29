@@ -9,6 +9,7 @@ const logger = require('./config/logger');
 const callScriptsRouter = require('./routes/callScripts');
 const transcriptsRouter = require('./routes/transcripts');
 const analysisRouter = require('./routes/analysis');
+const callStagesRouter = require('./routes/callStages');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,6 +63,7 @@ app.get('/health', (req, res) => {
 app.use('/api/call-scripts', callScriptsRouter);
 app.use('/api/transcripts', transcriptsRouter);
 app.use('/api/analysis', analysisRouter);
+app.use('/api/call-stages', callStagesRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -73,7 +75,8 @@ app.get('/', (req, res) => {
       health: '/health',
       callScripts: '/api/call-scripts',
       transcripts: '/api/transcripts',
-      analysis: '/api/analysis'
+      analysis: '/api/analysis',
+      callStages: '/api/call-stages'
     }
   });
 });

@@ -6,6 +6,7 @@ class Database {
     this.callScripts = new Map();
     this.transcripts = new Map();
     this.analyses = new Map();
+    this.callStages = new Map();
   }
 
   // Call Script operations
@@ -58,6 +59,26 @@ class Database {
     return Array.from(this.analyses.entries()).map(([id, analysis]) => ({
       id,
       ...analysis
+    }));
+  }
+
+  // Call Stages operations
+  saveCallStages(id, stages) {
+    this.callStages.set(id, {
+      ...stages,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
+  getCallStages(id) {
+    return this.callStages.get(id);
+  }
+
+  getAllCallStages() {
+    return Array.from(this.callStages.entries()).map(([id, stages]) => ({
+      id,
+      ...stages
     }));
   }
 }
