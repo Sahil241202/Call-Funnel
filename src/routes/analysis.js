@@ -1,144 +1,74 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const analysisService = require('../services/analysisService');
 const { validateAnalysisRequest } = require('../middleware/validation');
 const logger = require('../config/logger');
 
+// Configure multer for file uploads (in-memory storage)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+// Middleware to handle both JSON body and file uploads
+const handleRequestBody = async (req, res, next) => {
+  // If body already has data (JSON request), proceed
+  if (req.body && Object.keys(req.body).length > 0 && req.body.transcript) {
+    return next();
+  }
+  
+  // If file was uploaded (form-data), parse it
+  const uploadedFile = req.file || (req.files && req.files[0]);
+  
+  if (uploadedFile) {
+    try {
+      const fileContent = uploadedFile.buffer.toString('utf8');
+      const jsonData = JSON.parse(fileContent);
+      
+      // Populate req.body with parsed JSON data
+      req.body = jsonData;
+      logger.info('Parsed JSON from uploaded file:', Object.keys(jsonData));
+      return next();
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid JSON file',
+        error: error.message
+      });
+    }
+  }
+  
+  // If neither JSON body nor file is present, continue (validation will catch it)
+  next();
+};
+
 // Analyze a transcript against a call script
-router.post('/analyze', validateAnalysisRequest, async (req, res) => {
+// Accepts both: JSON body (raw) or file upload (form-data)
+router.post('/analyze', upload.any(), handleRequestBody, validateAnalysisRequest, async (req, res) => {
   try {
-    const { transcriptId, callScriptId, callStageId } = req.body;
+    const { transcript, callScript, callStages } = req.body;
     
-    const analysis = await analysisService.analyzeCall(transcriptId, callScriptId, callStageId);
+    const result = await analysisService.analyzeCall(transcript, callScript, callStages);
     
-    logger.info(`Analysis completed: ${analysis.id}`);
+    logger.info('Analysis completed successfully');
     
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       message: 'Analysis completed successfully',
-      data: analysis
+      data: {
+        result: result,
+        status: 'completed',
+        metadata: {
+          analyzedAt: new Date().toISOString()
+        }
+      }
     });
   } catch (error) {
     logger.error('Error performing analysis:', error);
     res.status(500).json({
       success: false,
       message: 'Analysis failed',
-      error: error.message
-    });
-  }
-});
-
-// Get a specific analysis
-router.get('/:id', async (req, res) => {
-  try {
-    const analysis = await analysisService.getAnalysis(req.params.id);
-    
-    res.json({
-      success: true,
-      data: analysis
-    });
-  } catch (error) {
-    logger.error('Error fetching analysis:', error);
-    res.status(404).json({
-      success: false,
-      message: 'Analysis not found',
-      error: error.message
-    });
-  }
-});
-
-// Get all analyses
-router.get('/', async (req, res) => {
-  try {
-    const analyses = await analysisService.getAllAnalyses();
-    
-    res.json({
-      success: true,
-      data: analyses
-    });
-  } catch (error) {
-    logger.error('Error fetching analyses:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch analyses',
-      error: error.message
-    });
-  }
-});
-
-// Get analyses by call script
-router.get('/script/:callScriptId', async (req, res) => {
-  try {
-    const analyses = await analysisService.getAnalysesByScript(req.params.callScriptId);
-    
-    res.json({
-      success: true,
-      data: analyses
-    });
-  } catch (error) {
-    logger.error('Error fetching analyses by script:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch analyses',
-      error: error.message
-    });
-  }
-});
-
-// Get analyses by transcript
-router.get('/transcript/:transcriptId', async (req, res) => {
-  try {
-    const analyses = await analysisService.getAnalysesByTranscript(req.params.transcriptId);
-    
-    res.json({
-      success: true,
-      data: analyses
-    });
-  } catch (error) {
-    logger.error('Error fetching analyses by transcript:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch analyses',
-      error: error.message
-    });
-  }
-});
-
-// Get analysis statistics
-router.get('/stats/overview', async (req, res) => {
-  try {
-    const analyses = await analysisService.getAllAnalyses();
-    const statistics = analysisService.calculateStatistics(analyses);
-    
-    res.json({
-      success: true,
-      data: statistics
-    });
-  } catch (error) {
-    logger.error('Error calculating statistics:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to calculate statistics',
-      error: error.message
-    });
-  }
-});
-
-// Get statistics for a specific call script
-router.get('/stats/script/:callScriptId', async (req, res) => {
-  try {
-    const analyses = await analysisService.getAnalysesByScript(req.params.callScriptId);
-    const statistics = analysisService.calculateStatistics(analyses);
-    
-    res.json({
-      success: true,
-      data: statistics
-    });
-  } catch (error) {
-    logger.error('Error calculating script statistics:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to calculate statistics',
       error: error.message
     });
   }

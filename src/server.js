@@ -2,14 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const logger = require('./config/logger');
 
-// Import routes
-const callScriptsRouter = require('./routes/callScripts');
-const transcriptsRouter = require('./routes/transcripts');
 const analysisRouter = require('./routes/analysis');
-const callStagesRouter = require('./routes/callStages');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,17 +19,6 @@ app.use(cors({
     : ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  }
-});
-app.use(limiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -59,11 +43,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/api/call-scripts', callScriptsRouter);
-app.use('/api/transcripts', transcriptsRouter);
-app.use('/api/analysis', analysisRouter);
-app.use('/api/call-stages', callStagesRouter);
+app.use('/api', analysisRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -73,10 +53,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      callScripts: '/api/call-scripts',
-      transcripts: '/api/transcripts',
-      analysis: '/api/analysis',
-      callStages: '/api/call-stages'
+      analysis: '/api/analysis'
     }
   });
 });

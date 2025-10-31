@@ -1,134 +1,63 @@
 const geminiService = require('../config/gemini');
-const database = require('../config/database');
 const logger = require('../config/logger');
-const { v4: uuidv4 } = require('uuid');
 
 class AnalysisService {
-  async analyzeCall(transcriptId, callScriptId, callStageId) {
+  async analyzeCall(transcript, callScript, callStages) {
     try {
-      // Get transcript, call script, and call stages from database
-      const transcript = database.getTranscript(transcriptId);
-      const callScript = database.getCallScript(callScriptId);
-      const callStages = database.getCallStages(callStageId);
-
-      if (!transcript) {
-        throw new Error('Transcript not found');
+      // Validate inputs
+      if (!transcript || typeof transcript !== 'string') {
+        throw new Error('Transcript must be a non-empty string');
       }
 
-      if (!callScript) {
-        throw new Error('Call script not found');
+      if (!callScript || typeof callScript !== 'string') {
+        throw new Error('Call script must be a non-empty string');
       }
 
-      if (!callStages) {
-        throw new Error('Call stages not found');
+      if (!Array.isArray(callStages) || callStages.length === 0) {
+        throw new Error('Call stages must be a non-empty array');
       }
 
       // Perform AI analysis
       const analysisResult = await geminiService.analyzeCallScript(
-        transcript.content,
+        transcript,
         callScript,
         callStages
       );
 
-      // Create analysis record
-      const analysisId = uuidv4();
-      const analysis = {
-        id: analysisId,
-        transcriptId,
-        callScriptId,
-        callStageId,
-        result: analysisResult,
-        status: 'completed',
-        metadata: {
-          transcriptMetadata: transcript.metadata,
-          callScriptName: callScript.name,
-          callStagesName: callStages.name,
-          analyzedAt: new Date()
+      // Extract stage names from callStages array structure (new format with stageName field)
+      const stageNames = callStages.map(stageObj => stageObj.stageName);
+
+      // Determine drop-off stage: first required stage marked as not present
+      let dropOff = null;
+      for (const stageObj of callStages) {
+        if (stageObj.required === true) {
+          // Find this stage in the analysis result
+          const stageResult = analysisResult.stages?.find(s => s.stageName === stageObj.stageName);
+          if (stageResult && stageResult.present === false) {
+            dropOff = stageObj.stageName;
+            break;
+          }
         }
+      }
+
+      // The result already includes dropOff, stages, callStageSequence, and summary from Gemini
+      // Ensure dropOff is set correctly
+      const result = {
+        stages: analysisResult.stages,
+        dropOff: analysisResult.dropOff || dropOff,
+        callStageSequence: analysisResult.callStageSequence || [],
+        summary: analysisResult.summary
       };
 
-      // Save analysis
-      database.saveAnalysis(analysisId, analysis);
+      logger.info('Analysis completed successfully');
 
-      logger.info(`Analysis completed for transcript ${transcriptId}, script ${callScriptId}, and stages ${callStageId}`);
-
-      return analysis;
+      return result;
     } catch (error) {
       logger.error('Analysis service error:', error);
       throw error;
     }
   }
 
-  async getAnalysis(analysisId) {
-    const analysis = database.getAnalysis(analysisId);
-    if (!analysis) {
-      throw new Error('Analysis not found');
-    }
-    return analysis;
-  }
-
-  async getAllAnalyses() {
-    return database.getAllAnalyses();
-  }
-
-  async getAnalysesByScript(callScriptId) {
-    const allAnalyses = database.getAllAnalyses();
-    return allAnalyses.filter(analysis => analysis.callScriptId === callScriptId);
-  }
-
-  async getAnalysesByTranscript(transcriptId) {
-    const allAnalyses = database.getAllAnalyses();
-    return allAnalyses.filter(analysis => analysis.transcriptId === transcriptId);
-  }
-
-  // Helper method to calculate overall statistics
-  calculateStatistics(analyses) {
-    if (!analyses || analyses.length === 0) {
-      return {
-        totalAnalyses: 0,
-        averageScore: 0,
-        pointCoverage: {
-          introduction: 0,
-          pitch: 0,
-          dataCollection: 0,
-          closing: 0
-        }
-      };
-    }
-
-    const totalAnalyses = analyses.length;
-    const totalScore = analyses.reduce((sum, analysis) => 
-      sum + (analysis.result.overallScore || 0), 0);
-    const averageScore = totalScore / totalAnalyses;
-
-    const pointCoverage = {
-      introduction: 0,
-      pitch: 0,
-      dataCollection: 0,
-      closing: 0
-    };
-
-    analyses.forEach(analysis => {
-      if (analysis.result.points) {
-        Object.keys(pointCoverage).forEach(point => {
-          if (analysis.result.points[point]?.present) {
-            pointCoverage[point]++;
-          }
-        });
-      }
-    });
-
-    // Convert to percentages
-    Object.keys(pointCoverage).forEach(point => {
-      pointCoverage[point] = Math.round((pointCoverage[point] / totalAnalyses) * 100);
-    });
-
-    return {
-      totalAnalyses,
-      averageScore: Math.round(averageScore * 10) / 10,
-      pointCoverage
-    };
-  }
 }
 
 module.exports = new AnalysisService();

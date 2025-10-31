@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "properties": {
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stageName": {
+            "type": "string"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "string"
+          }
+        },
+        "required": ["stageName", "present", "evidence"]
+      }
+    },
+    "dropOff": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "callStageSequence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": ["stages", "dropOff", "callStageSequence", "summary"]
+}
+
