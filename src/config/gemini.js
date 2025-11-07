@@ -1,6 +1,37 @@
 const { GoogleGenAI, Type } = require('@google/genai');
 const logger = require('./logger');
-const responseSchemaJson = require('../../responseSchema.json');
+
+// Define the response schema directly in Type format for @google/genai
+// This matches the structure defined in responseSchema.json
+const RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    stages: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          stageName: { type: Type.STRING },
+          present: { type: Type.BOOLEAN },
+          evidence: { type: Type.STRING }
+        },
+        required: ['stageName', 'present', 'evidence']
+      }
+    },
+    dropOff: {
+      type: Type.STRING,
+      nullable: true
+    },
+    callStageSequence: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    },
+    summary: {
+      type: Type.STRING
+    }
+  },
+  required: ['stages', 'dropOff', 'callStageSequence', 'summary']
+};
 
 class GeminiService {
   constructor() {
@@ -14,113 +45,25 @@ class GeminiService {
     this.ai = new GoogleGenAI({ apiKey: this.apiKey });
   }
 
-  // Convert JSON schema to Type-based schema for @google/genai
-  convertJsonSchemaToType(jsonSchema) {
-    if (jsonSchema.type === 'object') {
-      const schema = {
-        type: Type.OBJECT,
-        properties: {},
-        required: jsonSchema.required || []
-      };
-
-      Object.keys(jsonSchema.properties || {}).forEach(key => {
-        const prop = jsonSchema.properties[key];
-        
-        if (prop.type === 'array') {
-          // Handle array items
-          if (prop.items && prop.items.additionalProperties) {
-            // Handle dynamic object keys in array (stages)
-            schema.properties[key] = {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                additionalProperties: this.convertJsonSchemaToType(prop.items.additionalProperties)
-              }
-            };
-          } else if (prop.items) {
-            schema.properties[key] = {
-              type: Type.ARRAY,
-              items: this.convertJsonSchemaToType(prop.items)
-            };
-          } else {
-            schema.properties[key] = { type: Type.ARRAY };
-          }
-        } else if (prop.type === 'string') {
-          schema.properties[key] = { type: Type.STRING };
-        } else if (prop.type === 'boolean') {
-          schema.properties[key] = { type: Type.BOOLEAN };
-        } else if (prop.oneOf) {
-          // Handle nullable types (string | null)
-          schema.properties[key] = { 
-            type: Type.STRING,
-            nullable: true 
-          };
-        } else if (prop.type === 'object') {
-          schema.properties[key] = this.convertJsonSchemaToType(prop);
-        }
-      });
-
-      return schema;
-    } else if (jsonSchema.type === 'array') {
-      return {
-        type: Type.ARRAY,
-        items: this.convertJsonSchemaToType(jsonSchema.items)
-      };
-    } else if (jsonSchema.type === 'string') {
-      return { type: Type.STRING };
-    } else if (jsonSchema.type === 'boolean') {
-      return { type: Type.BOOLEAN };
-    }
-    
-    return jsonSchema;
-  }
-
   async analyzeCallScript(transcript, callScript, callStages) {
     try {
       const prompt = this.buildAnalysisPrompt(transcript, callScript, callStages);
       
-      // Convert JSON schema to Type-based schema
-      const responseSchema = this.convertJsonSchemaToType(responseSchemaJson);
-      
       // Use the new @google/genai API structure
+      // With responseSchema and responseMimeType, Gemini guarantees JSON response
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
-          responseSchema: responseSchema
+          responseSchema: RESPONSE_SCHEMA
         }
       });
       
-      // The new API might return text as a property or the response might be structured differently
-      let text;
-      
-      // Log response structure for debugging
-      logger.info('Response type:', typeof response);
-      logger.info('Response keys:', Object.keys(response || {}));
-      
-      if (typeof response === 'string') {
-        // Response is already the text string
-        text = response;
-      } else if (typeof response.text === 'function') {
-        text = await response.text();
-      } else if (typeof response.text === 'string') {
-        text = response.text;
-      } else if (response.data && typeof response.data === 'string') {
-        text = response.data;
-      } else if (response.content) {
-        if (typeof response.content === 'string') {
-          text = response.content;
-        } else if (typeof response.content.text === 'function') {
-          text = await response.content.text();
-        } else if (typeof response.content.text === 'string') {
-          text = response.content.text;
-        }
-      } else {
-        // Log the full response for debugging
-        logger.error('Unexpected response structure:', JSON.stringify(response, null, 2));
-        throw new Error('Unexpected response structure from Gemini API. Check logs for details.');
-      }
+      // Gemini returns JSON text when responseSchema is provided
+      const text = typeof response.text === 'function' 
+        ? await response.text() 
+        : response.text;
       
       return this.parseAnalysisResponse(text);
     } catch (error) {
